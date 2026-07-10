@@ -105,7 +105,7 @@ def transcribe(file_id):
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", "faster-whisper"], check=True)
         from faster_whisper import WhisperModel
     if _model is None:
-        _model = WhisperModel("base", device="cpu", compute_type="int8")
+        _model = WhisperModel("small", device="cpu", compute_type="int8")
     segs, _ = _model.transcribe("voice.ogg", language="vi")
     text = " ".join(s.text for s in segs).strip()
     print("Voice ->", text)
