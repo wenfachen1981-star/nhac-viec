@@ -46,8 +46,14 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
-            echo "Khong co thay doi."
-          else
-            git commit -m "cap nhat trang thai viec [skip ci]"
-            git push
+            echo "Khong co thay doi."; exit 0
           fi
+          git commit -m "cap nhat trang thai viec [skip ci]"
+          for i in 1 2 3 4 5; do
+            if git push; then echo "Pushed."; exit 0; fi
+            echo "Push bi tu choi, dong bo lai ($i)..."
+            git fetch origin main
+            git rebase -X theirs origin/main || git rebase --abort
+            sleep 3
+          done
+          echo "Push that bai sau 5 lan"; exit 1
