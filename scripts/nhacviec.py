@@ -249,6 +249,41 @@ def find_number(text):
     return None
 
 
+VOICE_FILLER = {"nhắc", "nhac", "nhở", "nho", "hãy", "hay", "giúp", "giup", "mình", "minh",
+                "tôi", "toi", "cho", "lúc", "luc", "vào", "vao", "rưỡi", "ruoi", "sáng", "sang",
+                "chiều", "chieu", "tối", "toi", "trưa", "trua", "giờ", "gio", "và", "va", "ơi",
+                "đi", "hằng", "hang", "hàng", "ngày", "ngay", "mỗi", "moi", "là", "la"}
+
+
+def parse_voice_reminder(spoken, now):
+    """Hieu voice kieu '12 gio an com' / 'hang ngay 7 gio tap the duc' -> meta lich."""
+    s = spoken.lower().strip()
+    daily = any(k in s for k in ("hằng ngày", "hang ngay", "hàng ngày", "mỗi ngày", "moi ngay", "mỗi sáng"))
+    ruoi = ("rưỡi" in s) or ("ruoi" in s)
+    m = re.search(r"(\d{1,2})\s*(?::|h|giờ|gio)\s*(\d{1,2})?", s)
+    if not m:
+        return None
+    hh = int(m.group(1))
+    mm = int(m.group(2)) if m.group(2) else (30 if ruoi else 0)
+    if re.search(r"chiều|chieu|tối|toi", s) and hh < 12:
+        hh += 12
+    if re.search(r"trưa|trua", s) and hh < 11:
+        hh += 12
+    hh %= 24; mm %= 60
+    src = (s[:m.start()] + " " + s[m.end():])
+    toks = [w for w in re.split(r"[\s,\.]+", src)
+            if w and w not in VOICE_FILLER and not re.fullmatch(r"\d+", w)]
+    text = " ".join(toks).strip()
+    if not text:
+        return None
+    if daily:
+        return {"kind": "daily", "hh": hh, "mm": mm, "text": text}
+    due = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    if due < now:
+        due += timedelta(days=1)
+    return {"kind": "once", "y": due.year, "mo": due.month, "d": due.day, "hh": hh, "mm": mm, "text": text}
+
+
 # ---------------- main ----------------
 def main():
     lines, tasks = load_tasks()
@@ -439,12 +474,23 @@ def main():
 
         if "voice" in msg:
             spoken = transcribe(msg["voice"]["file_id"])
-            n = find_number(spoken)
-            if n:
-                txt = mark_num(n)
-                replies.append(("✅ Xong: " + txt) if txt else ("🎤 Nghe \"%s\" — không có việc số %d." % (spoken, n)))
+            low = spoken.lower()
+            if any(h in low for h in DONE_HINTS):
+                # bao xong
+                n = find_number(low)
+                if n:
+                    txt = mark_num(n)
+                    replies.append(("✅ Xong: " + txt) if txt else ("🎤 Nghe \"%s\" — không có việc số %d." % (spoken, n)))
+                else:
+                    replies.append("🎤 Nghe: \"%s\" — chưa rõ việc số mấy. Nói vd \"việc số 2 xong\"." % spoken)
             else:
-                replies.append("🎤 Nghe: \"%s\" — chưa rõ việc số mấy. Nói kèm số, vd \"việc số 2 xong\"." % spoken)
+                # tao lich bang voice
+                meta = parse_voice_reminder(spoken, now)
+                if meta:
+                    add_task(meta)
+                    replies.append("⏰ (voice) Đã đặt lịch: \"%s\" — %s\nNghe: \"%s\". Sai thì gõ: doigio N ... / xoa N" % (meta["text"], when_text(meta), spoken))
+                else:
+                    replies.append("🎤 Nghe: \"%s\" — chưa hiểu.\n• Tạo lịch: nói \"12 giờ ăn cơm\"\n• Báo xong: nói \"việc số 2 xong\"" % spoken)
             continue
 
         if "text" in msg:
