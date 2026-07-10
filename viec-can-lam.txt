@@ -1,2 +1,4 @@
 # DANH SACH VIEC CAN LAM
 # Tao/quan ly ngay tren Telegram. Go "?" gui cho bot de xem huong dan.
+
+[ ] ⏰ 2026-07-11 02:00 — việc số ãy lưu ăn cơm
