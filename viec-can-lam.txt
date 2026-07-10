@@ -1,3 +1,2 @@
 # DANH SACH VIEC CAN LAM
-# Tao lich ngay tren Telegram: them <viec> | nhac 20:00 <viec> | nhac hangngay 09:00 <viec>
-# Bao xong: nut ✅ / voice "viec so N xong" / go "xong N". Xem: ds. Xoa: xoa N.
+# Tao/quan ly ngay tren Telegram. Go "?" gui cho bot de xem huong dan.
