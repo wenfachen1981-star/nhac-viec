@@ -210,6 +210,91 @@ def main():
             return mark_done(act[n - 1], daily, now)
         return None
 
+    def process_text(raw):
+        raw = raw.strip()
+        low = raw.lower()
+        low = low.replace("hằng ngày", "hangngay").replace("hang ngay", "hangngay").replace("mỗi ngày", "hangngay").replace("moi ngay", "hangngay")
+
+        # bao xong
+        if any(h in low for h in DONE_HINTS) and not low.startswith(("them", "nhac", "nhắc", "xoa", "xóa")):
+            n = find_number(low)
+            if n:
+                txt = mark_display(n)
+                if txt:
+                    done_msgs.append(txt)
+                else:
+                    replies.append("Không có việc số %d đang chờ." % n)
+            return
+
+        if low in ("?", "help", "huongdan", "hướng dẫn", "menu", "/start", "start"):
+            replies.append(HELP); return
+        if low in ("ds", "danhsach", "danh sach", "/list", "list"):
+            act = active_list()
+            out = ["📋 Việc đang chờ (%d):" % len(act)]
+            for i, t in enumerate(act, 1):
+                out.append("%d. %s" % (i, t["meta"]["text"]))
+            upcoming = [t for t in tasks if not is_active(t, now, daily) and not t["done"] and t["meta"]["kind"] != "plain"]
+            if upcoming:
+                out.append("\n⏳ Sắp tới:")
+                for t in upcoming:
+                    m = t["meta"]
+                    when = ("mỗi ngày %02d:%02d" % (m["hh"], m["mm"])) if m["kind"] == "daily" else ("%02d/%02d %02d:%02d" % (m["d"], m["mo"], m["hh"], m["mm"]))
+                    out.append("• %s (%s)" % (m["text"], when))
+            replies.append("\n".join(out)); return
+
+        if low.startswith(("xoa ", "xóa ")):
+            n = find_number(low)
+            act = active_list()
+            if n and 1 <= n <= len(act):
+                tgt = act[n - 1]
+                lines[tgt["lineno"]] = None
+                tasks.remove(tgt)
+                replies.append("🗑️ Đã xoá: " + tgt["meta"]["text"])
+            else:
+                replies.append("Không tìm thấy việc số %s để xoá." % n)
+            return
+
+        if low.startswith(("them ", "/them ")):
+            text = raw.split(" ", 1)[1].strip()
+            if text:
+                lines.append(render({"done": False, "meta": {"kind": "plain", "text": text}}))
+                tasks.append({"lineno": len(lines) - 1, "done": False, "meta": {"kind": "plain", "text": text}})
+                replies.append("➕ Đã thêm việc: " + text)
+            return
+
+        if low.startswith(("nhac ", "nhắc ", "/nhac ")):
+            rest = raw.split(" ", 1)[1].strip()
+            toks = rest.split()
+            low_toks = low.split()[1:]
+            meta = None
+            if low_toks and low_toks[0] == "hangngay" and len(toks) >= 2:
+                hm = parse_hm(toks[1])
+                if hm:
+                    meta = {"kind": "daily", "hh": hm[0], "mm": hm[1], "text": " ".join(toks[2:]).strip()}
+            if meta is None and len(toks) >= 2:
+                dt = parse_date(toks[0], now)
+                if dt:
+                    hm = parse_hm(toks[1])
+                    if hm:
+                        meta = {"kind": "once", "y": dt[0], "mo": dt[1], "d": dt[2], "hh": hm[0], "mm": hm[1], "text": " ".join(toks[2:]).strip()}
+            if meta is None and len(toks) >= 1:
+                hm = parse_hm(toks[0])
+                if hm:
+                    due = now.replace(hour=hm[0], minute=hm[1], second=0, microsecond=0)
+                    if due < now:
+                        due = due + timedelta(days=1)
+                    meta = {"kind": "once", "y": due.year, "mo": due.month, "d": due.day, "hh": hm[0], "mm": hm[1], "text": " ".join(toks[1:]).strip()}
+            if meta and meta["text"]:
+                lines.append(render({"done": False, "meta": meta}))
+                tasks.append({"lineno": len(lines) - 1, "done": False, "meta": meta})
+                when = ("mỗi ngày %02d:%02d" % (meta["hh"], meta["mm"])) if meta["kind"] == "daily" else ("%02d/%02d lúc %02d:%02d" % (meta["d"], meta["mo"], meta["hh"], meta["mm"]))
+                replies.append("⏰ Đã đặt lịch nhắc: \"%s\" — %s" % (meta["text"], when))
+            else:
+                replies.append("Cú pháp chưa đúng.\n" + HELP)
+            return
+
+        replies.append("Mình chưa hiểu lệnh này.\n" + HELP)
+
     for u in updates:
         new_offset = max(new_offset, u["update_id"])
 
@@ -249,96 +334,11 @@ def main():
                 replies.append("🎤 Nghe: \"%s\" — chưa rõ việc số mấy. Nói kèm số, ví dụ \"việc số 2 xong rồi\"." % spoken)
             continue
 
-        # ----- text lenh -----
+        # ----- text lenh (moi dong 1 lenh) -----
         if "text" in msg:
-            raw = msg["text"].strip()
-            low = raw.lower()
-            low = low.replace("hằng ngày", "hangngay").replace("hang ngay", "hangngay").replace("mỗi ngày", "hangngay").replace("moi ngay", "hangngay")
-
-            # bao xong
-            if any(h in low for h in DONE_HINTS) and not low.startswith(("them", "nhac", "nhắc", "xoa", "xóa")):
-                n = find_number(low)
-                if n:
-                    txt = mark_display(n)
-                    if txt:
-                        done_msgs.append(txt)
-                    else:
-                        replies.append("Không có việc số %d đang chờ." % n)
-                continue
-
-            # help / list
-            if low in ("?", "help", "huongdan", "hướng dẫn", "menu", "/start", "start"):
-                replies.append(HELP); continue
-            if low in ("ds", "danhsach", "danh sach", "/list", "list"):
-                act = active_list()
-                out = ["📋 Việc đang chờ (%d):" % len(act)]
-                for i, t in enumerate(act, 1):
-                    out.append("%d. %s" % (i, t["meta"]["text"]))
-                upcoming = [t for t in tasks if not is_active(t, now, daily) and not t["done"] and t["meta"]["kind"] != "plain"]
-                if upcoming:
-                    out.append("\n⏳ Sắp tới:")
-                    for t in upcoming:
-                        m = t["meta"]
-                        when = ("mỗi ngày %02d:%02d" % (m["hh"], m["mm"])) if m["kind"] == "daily" else ("%02d/%02d %02d:%02d" % (m["d"], m["mo"], m["hh"], m["mm"]))
-                        out.append("• %s (%s)" % (m["text"], when))
-                replies.append("\n".join(out)); continue
-
-            # xoa N
-            if low.startswith(("xoa ", "xóa ")):
-                n = find_number(low)
-                act = active_list()
-                if n and 1 <= n <= len(act):
-                    tgt = act[n - 1]
-                    lines[tgt["lineno"]] = None  # danh dau xoa
-                    tasks.remove(tgt)
-                    replies.append("🗑️ Đã xoá: " + tgt["meta"]["text"])
-                else:
-                    replies.append("Không tìm thấy việc số %s để xoá." % n)
-                continue
-
-            # them <viec>
-            if low.startswith(("them ", "/them ")):
-                text = raw.split(" ", 1)[1].strip()
-                if text:
-                    lines.append(render({"done": False, "meta": {"kind": "plain", "text": text}}))
-                    tasks.append({"lineno": len(lines) - 1, "done": False, "meta": {"kind": "plain", "text": text}})
-                    replies.append("➕ Đã thêm việc: " + text)
-                continue
-
-            # nhac ...
-            if low.startswith(("nhac ", "nhắc ", "/nhac ")):
-                rest = raw.split(" ", 1)[1].strip()
-                toks = rest.split()
-                low_toks = low.split()[1:]
-                meta = None; consume = 0
-                if low_toks and low_toks[0] == "hangngay" and len(toks) >= 2:
-                    hm = parse_hm(toks[1])
-                    if hm:
-                        meta = {"kind": "daily", "hh": hm[0], "mm": hm[1], "text": " ".join(toks[2:]).strip()}
-                if meta is None and len(toks) >= 2:
-                    dt = parse_date(toks[0], now)
-                    if dt:
-                        hm = parse_hm(toks[1])
-                        if hm:
-                            meta = {"kind": "once", "y": dt[0], "mo": dt[1], "d": dt[2], "hh": hm[0], "mm": hm[1], "text": " ".join(toks[2:]).strip()}
-                if meta is None and len(toks) >= 1:
-                    hm = parse_hm(toks[0])
-                    if hm:
-                        due = now.replace(hour=hm[0], minute=hm[1], second=0, microsecond=0)
-                        if due < now:
-                            due = due + timedelta(days=1)
-                        meta = {"kind": "once", "y": due.year, "mo": due.month, "d": due.day, "hh": hm[0], "mm": hm[1], "text": " ".join(toks[1:]).strip()}
-                if meta and meta["text"]:
-                    lines.append(render({"done": False, "meta": meta}))
-                    tasks.append({"lineno": len(lines) - 1, "done": False, "meta": meta})
-                    when = ("mỗi ngày %02d:%02d" % (meta["hh"], meta["mm"])) if meta["kind"] == "daily" else ("%02d/%02d lúc %02d:%02d" % (meta["d"], meta["mo"], meta["hh"], meta["mm"]))
-                    replies.append("⏰ Đã đặt lịch nhắc: \"%s\" — %s" % (meta["text"], when))
-                else:
-                    replies.append("Cú pháp chưa đúng.\n" + HELP)
-                continue
-
-            # khong hieu
-            replies.append("Mình chưa hiểu lệnh này.\n" + HELP)
+            for _cmd in msg["text"].split("\n"):
+                if _cmd.strip():
+                    process_text(_cmd)
             continue
 
     # ---- ghi trang thai ----
