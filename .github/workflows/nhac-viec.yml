@@ -2,9 +2,16 @@ name: Nhac viec
 
 on:
   schedule:
-    # 01:00 UTC = 08:00 gio Viet Nam (VN = UTC+7). Doi gio thi sua so dau tien.
-    - cron: '0 1 * * *'
-  workflow_dispatch:   # cho phep bam chay tay de test
+    # Moi 30 phut trong khung 07:00-22:30 gio VN (UTC = VN - 7 => UTC 0..15)
+    - cron: '0,30 0-15 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # de commit lai trang thai viec + offset
+
+concurrency:
+  group: nhac-viec
+  cancel-in-progress: false
 
 jobs:
   remind:
@@ -12,23 +19,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build message and send to Telegram
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache deps & whisper model
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/huggingface
+          key: nhacviec-cache-v1
+
+      - name: Install base deps
+        run: pip install --quiet requests
+
+      - name: Run reminder
         env:
           TG_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/nhacviec.py
+
+      - name: Commit updated state
         run: |
-          NGAY=$(TZ=Asia/Ho_Chi_Minh date '+%d/%m/%Y')
-          MSG=$(printf '📋 Nhắc việc hôm nay (%s):' "$NGAY")
-          FOUND=0
-          while IFS= read -r line || [ -n "$line" ]; do
-            case "$line" in
-              \#*) ;;                                  # dong ghi chu -> bo qua
-              '[ ]'*) t="${line#\[ \]}"; MSG="$MSG"$'\n'"• ${t# }"; FOUND=1 ;;
-            esac
-          done < viec-can-lam.txt
-          if [ "$FOUND" = "0" ]; then
-            MSG="$MSG"$'\n'"(Hom nay khong co viec nao trong danh sach)"
+          git config user.name "nhacviec-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Khong co thay doi."
+          else
+            git commit -m "cap nhat trang thai viec [skip ci]"
+            git push
           fi
-          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TG_CHAT}" \
-            --data-urlencode "text=${MSG}"
