@@ -1,0 +1,9 @@
+# DANH SACH VIEC CAN LAM (ban cloud)
+# Moi dong 1 viec:
+#   [ ] = chua xong -> bot SE nhac
+#   [x] = da xong   -> bot BO QUA
+# Sua file nay trong GitHub (web hoac app dien thoai) la duoc, khong can may tinh.
+
+[ ] Vi du: goi dien cho khach hang A
+[ ] Vi du: nop bao cao thang
+[x] Vi du: viec da xong nen khong bi nhac
