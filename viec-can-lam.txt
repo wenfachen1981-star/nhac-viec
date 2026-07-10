@@ -1,5 +1,5 @@
 # DANH SACH VIEC CAN LAM
 # [ ] = chua xong (bot nhac) | [x] = da xong (bo qua) | # = ghi chu
 # Bao xong bang: nut ✅ duoi tin nhan, hoac gui voice "viec so N xong roi".
-[ ] Vi du: nop bao cao thang
-[ ] Vi du: goi khach hang A
+[x] Vi du: nop bao cao thang
+[x] Vi du: goi khach hang A
