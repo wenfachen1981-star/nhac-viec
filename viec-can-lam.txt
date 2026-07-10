@@ -1,6 +1,3 @@
 # DANH SACH VIEC CAN LAM
-# [ ] = chua xong (bot nhac) | [x] = da xong (bo qua) | # = ghi chu
-# Bao xong bang: nut ✅ duoi tin nhan, hoac gui voice "viec so N xong roi".
-# --- Viet viec that cua ban ben duoi, moi dong 1 viec bat dau bang [ ] ---
-
-[ ] 🔁 09:00 — Uống thuốc them Gọi khách hàng A
+# Tao lich ngay tren Telegram: them <viec> | nhac 20:00 <viec> | nhac hangngay 09:00 <viec>
+# Bao xong: nut ✅ / voice "viec so N xong" / go "xong N". Xem: ds. Xoa: xoa N.
